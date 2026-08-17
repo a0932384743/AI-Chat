@@ -1,18 +1,15 @@
 services:
   # LiteLLM proxy — OpenAI-compatible gateway in front of your LLM provider(s).
-  # Runs the official LiteLLM image directly (no repo Dockerfile needed).
+  # Built from docker/litellm/Dockerfile, which bakes in litellm.config.yaml
+  # (chat + embedding models — the knowledge base feature needs both).
   - type: web
     name: litellm-proxy
-    runtime: image
+    runtime: docker
+    dockerfilePath: ./docker/litellm/Dockerfile
+    dockerContext: .
     plan: starter
     region: oregon
-    image:
-      url: ghcr.io/berriai/litellm:main-stable
     healthCheckPath: /health/liveliness
-    # Starts a single-model proxy; provider credentials come from env vars below.
-    # Swap --model for any LiteLLM-supported model (see litellm.config.example.yaml
-    # for a multi-model / config-file based setup instead).
-    dockerCommand: "--model gpt-4o-mini --port 4000"
     envVars:
       - key: PORT
         value: "4000"
@@ -42,3 +39,10 @@ services:
           envVarKey: LITELLM_MASTER_KEY
       - key: LITELLM_MODEL
         value: gpt-4o-mini
+      - key: LITELLM_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      # Knowledge base storage is a JSON file on local disk. It survives
+      # restarts only if you attach a Render Disk mounted at this path —
+      # otherwise it resets on every deploy.
+      - key: KB_DATA_DIR
+        value: /var/data/kb

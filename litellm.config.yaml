@@ -1,10 +1,18 @@
 # Example LiteLLM proxy config. Copy to litellm.config.yaml, fill in your
 # provider API keys, then run:
 #   litellm --config litellm.config.yaml --port 4000
+#
+# Both a chat model and an embedding model are registered here because the
+# knowledge base feature needs an embeddings endpoint in addition to chat.
 model_list:
   - model_name: gpt-4o-mini
     litellm_params:
       model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
       api_key: os.environ/OPENAI_API_KEY
 
 general_settings:
