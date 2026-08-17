@@ -6,7 +6,8 @@ Vercel AI SDK for streaming responses. LiteLLM lets you talk to 100+ LLM provide
 
 It also includes a small file-based **knowledge base**: upload PDFs, Word docs, text
 files, or images, and the chat answers questions grounded in their content
-(retrieval-augmented generation).
+(retrieval-augmented generation) — plus **persistent chat history**, so past
+conversations are saved and can be revisited or deleted.
 
 ## Requirements
 
@@ -70,17 +71,34 @@ Tuning via env vars: `KB_DATA_DIR` (storage location), `KB_MAX_FILE_SIZE_MB` (up
 limit, default 15), `KB_TOP_K` (chunks retrieved per question, default 4),
 `KB_MIN_SIMILARITY` (relevance cutoff, default 0.75).
 
+## Chat history
+
+The left-most panel lists past conversations. A new one is created automatically when
+you first open the app; use **+ 新對話** to start another, click a past conversation to
+resume it (its messages reload into the chat window), or **刪除** to remove it. Every
+exchange is saved after the model finishes replying — the title is auto-generated from
+your first message — to `data/conversations.json` by default (same `KB_DATA_DIR` as the
+knowledge base).
+
 ## How it works
 
 - `app/api/chat/route.ts` — retrieves relevant knowledge base chunks for the latest user
-  message, then streams a response from LiteLLM via `@ai-sdk/openai`.
+  message, streams a response from LiteLLM via `@ai-sdk/openai`, then persists the
+  conversation's messages once the reply finishes.
 - `app/api/kb/documents/route.ts`, `app/api/kb/documents/[id]/route.ts` — upload/list/delete
   knowledge base documents.
+- `app/api/conversations/route.ts`, `app/api/conversations/[id]/route.ts` —
+  list/create/fetch/rename/delete chat conversations.
 - `lib/kb/extract.ts`, `extractImage.ts` — turn PDFs/DOCX/text/images into plain text.
-- `lib/kb/chunk.ts`, `embeddings.ts`, `store.ts` — chunking, embedding, and a small
-  JSON-file-backed vector store with brute-force cosine similarity search.
+- `lib/kb/chunk.ts`, `embeddings.ts` — chunking and embedding.
+- `lib/jsonFileStore.ts` — small JSON-file-backed store with serialized writes, shared by
+  `lib/kb/store.ts` (documents/chunks + cosine similarity search) and
+  `lib/history/store.ts` (conversations).
+- `components/ChatApp.tsx` — client-side orchestrator wiring the conversation list, the
+  knowledge base panel, and the chat window together.
 - `components/ChatWindow.tsx` / `ChatMessage.tsx` — chat UI built on the AI SDK's `useChat`
   hook.
+- `components/ConversationList.tsx` — history sidebar.
 - `components/KnowledgeBase.tsx` — upload form and document list.
 
 Because LiteLLM speaks the OpenAI API, swapping the underlying model/provider only
@@ -115,8 +133,9 @@ Notes:
 - If your Render account doesn't auto-fill `LITELLM_API_KEY` via `fromService`/`envVarKey`,
   copy `LITELLM_MASTER_KEY`'s generated value from the `litellm-proxy` service's Environment tab
   into `ai-chat-web`'s `LITELLM_API_KEY` manually.
-- **Knowledge base persistence**: by default `KB_DATA_DIR` (`/var/data/kb`) lives on the
-  service's ephemeral disk and resets on every deploy. To persist uploads, attach a
+- **Data persistence**: by default `KB_DATA_DIR` (`/var/data/kb`) — which holds both the
+  knowledge base and chat history JSON files — lives on the service's ephemeral disk and
+  resets on every deploy. To persist uploads and chat history, attach a
   [Render Disk](https://render.com/docs/disks) to `ai-chat-web` mounted at that path, e.g.
   add under its service definition:
   ```yaml

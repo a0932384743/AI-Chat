@@ -1,14 +1,28 @@
 "use client";
 
-import { useChat } from "ai/react";
+import { useChat, type Message } from "ai/react";
 import { useEffect, useRef } from "react";
 import ChatMessage from "@/components/ChatMessage";
 
-export default function ChatWindow() {
+export default function ChatWindow({
+  conversationId,
+  initialMessages,
+  onExchangeComplete,
+}: {
+  conversationId: string | null;
+  initialMessages: Message[];
+  onExchangeComplete?: () => void;
+}) {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, reload } =
-    useChat({ api: "/api/chat" });
+    useChat({
+      api: "/api/chat",
+      initialMessages,
+      body: { conversationId },
+      onFinish: onExchangeComplete,
+    });
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const disabled = !conversationId;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,15 +70,16 @@ export default function ChatWindow() {
         <textarea
           value={input}
           onChange={handleInputChange}
+          disabled={disabled}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               (e.currentTarget.form as HTMLFormElement)?.requestSubmit();
             }
           }}
-          placeholder="Type a message..."
+          placeholder={disabled ? "正在建立對話..." : "Type a message..."}
           rows={1}
-          className="max-h-32 flex-1 resize-none rounded-xl border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/10 dark:focus:border-white/30"
+          className="max-h-32 flex-1 resize-none rounded-xl border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 disabled:opacity-50 dark:border-white/10 dark:focus:border-white/30"
         />
 
         {isLoading ? (
@@ -78,7 +93,7 @@ export default function ChatWindow() {
         ) : (
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={disabled || !input.trim()}
             className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-black"
           >
             Send
