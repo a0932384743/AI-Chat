@@ -1,0 +1,44 @@
+services:
+  # LiteLLM proxy — OpenAI-compatible gateway in front of your LLM provider(s).
+  # Runs the official LiteLLM image directly (no repo Dockerfile needed).
+  - type: web
+    name: litellm-proxy
+    runtime: image
+    plan: starter
+    region: oregon
+    image:
+      url: ghcr.io/berriai/litellm:main-stable
+    healthCheckPath: /health/liveliness
+    # Starts a single-model proxy; provider credentials come from env vars below.
+    # Swap --model for any LiteLLM-supported model (see litellm.config.example.yaml
+    # for a multi-model / config-file based setup instead).
+    dockerCommand: "--model gpt-4o-mini --port 4000"
+    envVars:
+      - key: PORT
+        value: "4000"
+      - key: LITELLM_MASTER_KEY
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # Next.js chat window, talking to litellm-proxy over Render's private network.
+  - type: web
+    name: ai-chat-web
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      # Internal hostname works because both services are in this same
+      # blueprint/region — "litellm-proxy" is the service name above and
+      # 4000 is the port it listens on.
+      - key: LITELLM_BASE_URL
+        value: http://litellm-proxy:4000
+      - key: LITELLM_API_KEY
+        fromService:
+          type: web
+          name: litellm-proxy
+          envVarKey: LITELLM_MASTER_KEY
+      - key: LITELLM_MODEL
+        value: gpt-4o-mini

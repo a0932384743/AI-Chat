@@ -54,3 +54,35 @@ Open [http://localhost:3000](http://localhost:3000) and start chatting.
 
 Because LiteLLM speaks the OpenAI API, swapping the underlying model/provider only
 requires changing `litellm.config.yaml` — no app code changes needed.
+
+## Deploying to Render
+
+`render.yaml` defines a [Render Blueprint](https://render.com/docs/blueprint-spec) with two
+services:
+
+- `litellm-proxy` — runs the official `ghcr.io/berriai/litellm` image directly (no Dockerfile
+  needed), started with `--model gpt-4o-mini`.
+- `ai-chat-web` — this Next.js app, wired to `litellm-proxy` over Render's internal network
+  (`http://litellm-proxy:4000`), with `LITELLM_API_KEY` pulled automatically from the proxy's
+  generated master key.
+
+To deploy:
+
+1. Push this repo to GitHub/GitLab.
+2. In the Render dashboard, choose **New +** → **Blueprint** and point it at the repo. Render
+   will pick up `render.yaml` automatically.
+3. When prompted, set the `OPENAI_API_KEY` secret on `litellm-proxy` (marked `sync: false` so
+   Render asks for it instead of storing it in the repo).
+4. Deploy. `ai-chat-web`'s public URL serves the chat window.
+
+Notes:
+
+- To use a different provider/model, edit `dockerCommand` on `litellm-proxy` (e.g.
+  `--model claude-3-5-sonnet-20241022`) and set the matching provider key (`ANTHROPIC_API_KEY`,
+  etc.) instead of/alongside `OPENAI_API_KEY`, and update `LITELLM_MODEL` on `ai-chat-web` to
+  match.
+- For multiple models, swap the CLI `--model` flag for a mounted config file (see
+  `litellm.config.example.yaml`) instead.
+- If your Render account doesn't auto-fill `LITELLM_API_KEY` via `fromService`/`envVarKey`,
+  copy `LITELLM_MASTER_KEY`'s generated value from the `litellm-proxy` service's Environment tab
+  into `ai-chat-web`'s `LITELLM_API_KEY` manually.
